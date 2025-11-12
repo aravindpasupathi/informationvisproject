@@ -49,18 +49,18 @@
             padding: 20px;
             background: #f8f9fa;
             border-radius: 10px;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: visible;
             width: 100%;
         }
 
         #line-chart, #bar-chart {
-            width: 100%;
+            min-width: 100%;
             overflow: visible;
         }
 
         #line-chart svg, #bar-chart svg {
             display: block;
-            width: 100%;
             height: auto;
         }
 
@@ -299,7 +299,7 @@
         let fullData = [];
         
         // Function to calculate responsive dimensions
-        function getChartDimensions() {
+        function getChartDimensions(dataPointCount = null) {
             // Get the actual width of the chart container
             const chartContainer = document.querySelector('.chart-container');
             let containerWidth;
@@ -322,7 +322,16 @@
             }
             
             const margin = { top: 40, right: 60, bottom: 80, left: 70 };
-            const width = containerWidth - margin.left - margin.right;
+            let width = containerWidth - margin.left - margin.right;
+            
+            // For bar charts, ensure minimum width based on data points
+            if (dataPointCount && dataPointCount > 0) {
+                const minBarWidth = 12; // Minimum pixels per bar
+                const minSpacing = 3; // Minimum spacing between bars
+                const minRequiredWidth = dataPointCount * (minBarWidth + minSpacing);
+                width = Math.max(width, minRequiredWidth);
+            }
+            
             const height = 450 - margin.top - margin.bottom;
             
             return { margin, width, height, containerWidth };
@@ -411,10 +420,7 @@
         });
 
         function createDualLineChart(data) {
-            // Get responsive dimensions
-            const { margin, width, height, containerWidth } = getChartDimensions();
-            
-            // Aggregate data by year
+            // Aggregate data by year first to get count
             const yearData = d3.rollup(data,
                 v => ({
                     na: d3.sum(v, d => d.NA_Sales),
@@ -429,16 +435,19 @@
                 eu: sales.eu
             })).sort((a, b) => a.year - b.year);
 
+            // Get responsive dimensions with data point count for better spacing
+            const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
+
             const svgWidth = width + margin.left + margin.right;
             const svgHeight = height + margin.top + margin.bottom;
 
-            // Create SVG - use 100% width to fill container
+            // Create SVG - use calculated width or 100% if it fits
             const svg = d3.select("#line-chart")
                 .append("svg")
-                .attr("width", "100%")
+                .attr("width", svgWidth > containerWidth ? svgWidth : "100%")
                 .attr("height", svgHeight)
                 .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
-                .attr("preserveAspectRatio", "xMidYMid meet")
+                .attr("preserveAspectRatio", svgWidth > containerWidth ? "none" : "xMidYMid meet")
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -565,10 +574,7 @@
         }
 
         function createStackedBarChart(data) {
-            // Get responsive dimensions
-            const { margin, width, height, containerWidth } = getChartDimensions();
-            
-            // Aggregate data by year and region
+            // Aggregate data by year and region first to get count
             const yearData = d3.rollup(data,
                 v => ({
                     na: d3.sum(v, d => d.NA_Sales),
@@ -588,16 +594,19 @@
                 total: sales.na + sales.eu + sales.jp + sales.other
             })).sort((a, b) => a.year - b.year);
 
+            // Get responsive dimensions with data point count for better spacing
+            const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
+
             const svgWidth = width + margin.left + margin.right;
             const svgHeight = height + margin.top + margin.bottom;
 
-            // Create SVG - use 100% width to fill container
+            // Create SVG - use calculated width or 100% if it fits
             const svg = d3.select("#bar-chart")
                 .append("svg")
-                .attr("width", "100%")
+                .attr("width", svgWidth > containerWidth ? svgWidth : "100%")
                 .attr("height", svgHeight)
                 .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
-                .attr("preserveAspectRatio", "xMidYMid meet")
+                .attr("preserveAspectRatio", svgWidth > containerWidth ? "none" : "xMidYMid meet")
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -609,11 +618,11 @@
 
             const stackedData = stack(aggregatedData);
 
-            // Scales
+            // Scales - reduce padding for wider bars
             const xScale = d3.scaleBand()
                 .domain(aggregatedData.map(d => d.year))
                 .range([0, width])
-                .padding(0.2);
+                .padding(aggregatedData.length > 30 ? 0.1 : 0.15);
 
             const yScale = d3.scaleLinear()
                 .domain([0, d3.max(aggregatedData, d => d.total) * 1.1])
