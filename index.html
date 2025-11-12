@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Game Sales Visualizations</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 30px;
+            overflow: hidden;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .chart-container {
+            margin-bottom: 60px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        #line-chart, #bar-chart {
+            width: 100%;
+            overflow: visible;
+        }
+
+        #line-chart svg, #bar-chart svg {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .chart-title {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .chart-description {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+
+        .axis-label {
+            font-size: 14px;
+            fill: #666;
+        }
+
+        .axis {
+            font-size: 12px;
+        }
+
+        .grid-line {
+            stroke: #e0e0e0;
+            stroke-width: 1;
+            stroke-dasharray: 3,3;
+        }
+
+        .line {
+            fill: none;
+            stroke-width: 3;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+        }
+
+        .line-na {
+            stroke: #4A90E2;
+        }
+
+        .line-eu {
+            stroke: #E24A4A;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .bar {
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .bar:hover {
+            opacity: 0.8;
+        }
+
+        .region-na { fill: #4A90E2; }
+        .region-eu { fill: #50C878; }
+        .region-jp { fill: #FF6B6B; }
+        .region-other { fill: #FFD93D; }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .controls-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .controls-title {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            gap: 20px;
+        }
+
+        .slider-label {
+            min-width: 120px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .slider-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .slider-value {
+            min-width: 60px;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+
+        @media (max-width: 768px) {
+            .slider-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .slider-label {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Video Game Sales Analysis</h1>
+        <p class="subtitle">Interactive visualizations of global video game sales data</p>
+
+        <!-- Controls -->
+        <div class="controls-container">
+            <h3 class="controls-title">📊 Filter Controls</h3>
+            <div class="slider-group">
+                <label class="slider-label">Start Year:</label>
+                <div class="slider-wrapper">
+                    <input type="range" id="minYearSlider" class="slider" min="1980" max="2020" value="1980">
+                    <span class="slider-value" id="minYearValue">1980</span>
+                </div>
+            </div>
+            <div class="slider-group">
+                <label class="slider-label">End Year:</label>
+                <div class="slider-wrapper">
+                    <input type="range" id="maxYearSlider" class="slider" min="1980" max="2020" value="2020">
+                    <span class="slider-value" id="maxYearValue">2020</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dual Line Chart -->
+        <div class="chart-container" id="line-chart-container">
+            <h2 class="chart-title">Sales Trends Over Time</h2>
+            <p class="chart-description">Comparing North American and European sales by year</p>
+            <div id="line-chart"></div>
+            <div class="legend" id="line-legend"></div>
+        </div>
+
+        <!-- Stacked Bar Chart -->
+        <div class="chart-container" id="bar-chart-container">
+            <h2 class="chart-title">Regional Sales Distribution</h2>
+            <p class="chart-description">Stacked bar chart showing sales by region over time</p>
+            <div id="bar-chart"></div>
+            <div class="legend" id="bar-legend"></div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Tooltip element
+        const tooltip = d3.select("#tooltip");
+        
+        // Global variable for full dataset
+        let fullData = [];
+        
+        // Function to calculate responsive dimensions
+        function getChartDimensions() {
+            // Get the actual width of the chart container
+            const chartContainer = document.querySelector('.chart-container');
+            let containerWidth;
+            
+            if (chartContainer) {
+                // Get computed style to account for padding
+                const style = window.getComputedStyle(chartContainer);
+                const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+                containerWidth = chartContainer.clientWidth - padding;
+            } else {
+                // Fallback: use container width minus padding
+                const mainContainer = document.querySelector('.container');
+                if (mainContainer) {
+                    const style = window.getComputedStyle(mainContainer);
+                    const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+                    containerWidth = mainContainer.clientWidth - padding - 40; // Extra margin
+                } else {
+                    containerWidth = Math.min(1200, window.innerWidth - 100);
+                }
+            }
+            
+            const margin = { top: 40, right: 60, bottom: 80, left: 70 };
+            const width = containerWidth - margin.left - margin.right;
+            const height = 450 - margin.top - margin.bottom;
+            
+            return { margin, width, height, containerWidth };
+        }
+
+        // Function to filter data by year range
+        function filterDataByYearRange(data, minYear, maxYear) {
+            return data.filter(d => d.Year >= minYear && d.Year <= maxYear);
+        }
+
+        // Function to update charts based on slider values
+        function updateCharts() {
+            const minYear = parseInt(document.getElementById('minYearSlider').value);
+            const maxYear = parseInt(document.getElementById('maxYearSlider').value);
+            
+            // Update slider value displays
+            document.getElementById('minYearValue').textContent = minYear;
+            document.getElementById('maxYearValue').textContent = maxYear;
+            
+            // Ensure minYear <= maxYear
+            if (minYear > maxYear) {
+                if (document.getElementById('minYearSlider') === document.activeElement) {
+                    document.getElementById('maxYearSlider').value = minYear;
+                    document.getElementById('maxYearValue').textContent = minYear;
+                } else {
+                    document.getElementById('minYearSlider').value = maxYear;
+                    document.getElementById('minYearValue').textContent = maxYear;
+                }
+                return updateCharts();
+            }
+            
+            // Filter data
+            const filteredData = filterDataByYearRange(fullData, minYear, maxYear);
+            
+            // Clear existing charts and legends
+            d3.select("#line-chart").selectAll("*").remove();
+            d3.select("#bar-chart").selectAll("*").remove();
+            d3.select("#line-legend").selectAll("*").remove();
+            d3.select("#bar-legend").selectAll("*").remove();
+            
+            // Recreate charts with filtered data
+            createDualLineChart(filteredData);
+            createStackedBarChart(filteredData);
+        }
+
+        // Load and process data
+        d3.csv("vgsales.csv").then(function(data) {
+            // Parse numeric values
+            data.forEach(d => {
+                d.Year = +d.Year;
+                d.NA_Sales = +d.NA_Sales;
+                d.EU_Sales = +d.EU_Sales;
+                d.JP_Sales = +d.JP_Sales;
+                d.Other_Sales = +d.Other_Sales;
+                d.Global_Sales = +d.Global_Sales;
+            });
+
+            // Filter out invalid years and store full dataset
+            fullData = data.filter(d => d.Year >= 1980 && d.Year <= 2020 && !isNaN(d.Year));
+            
+            // Get year range for sliders
+            const years = fullData.map(d => d.Year);
+            const minYear = Math.min(...years);
+            const maxYear = Math.max(...years);
+            
+            // Set slider ranges and initial values
+            document.getElementById('minYearSlider').min = minYear;
+            document.getElementById('minYearSlider').max = maxYear;
+            document.getElementById('minYearSlider').value = minYear;
+            document.getElementById('maxYearSlider').min = minYear;
+            document.getElementById('maxYearSlider').max = maxYear;
+            document.getElementById('maxYearSlider').value = maxYear;
+            document.getElementById('minYearValue').textContent = minYear;
+            document.getElementById('maxYearValue').textContent = maxYear;
+            
+            // Add event listeners to sliders
+            document.getElementById('minYearSlider').addEventListener('input', updateCharts);
+            document.getElementById('maxYearSlider').addEventListener('input', updateCharts);
+            
+            // Create initial charts with full data
+            createDualLineChart(fullData);
+            createStackedBarChart(fullData);
+        }).catch(function(error) {
+            console.error("Error loading data:", error);
+            d3.select(".container").html("<div class='loading'>Error loading data. Please ensure vgsales.csv is in the same directory.</div>");
+        });
+
+        function createDualLineChart(data) {
+            // Get responsive dimensions
+            const { margin, width, height, containerWidth } = getChartDimensions();
+            
+            // Aggregate data by year
+            const yearData = d3.rollup(data,
+                v => ({
+                    na: d3.sum(v, d => d.NA_Sales),
+                    eu: d3.sum(v, d => d.EU_Sales)
+                }),
+                d => d.Year
+            );
+
+            const aggregatedData = Array.from(yearData, ([year, sales]) => ({
+                year: year,
+                na: sales.na,
+                eu: sales.eu
+            })).sort((a, b) => a.year - b.year);
+
+            const svgWidth = width + margin.left + margin.right;
+            const svgHeight = height + margin.top + margin.bottom;
+
+            // Create SVG - use 100% width to fill container
+            const svg = d3.select("#line-chart")
+                .append("svg")
+                .attr("width", "100%")
+                .attr("height", svgHeight)
+                .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Scales
+            const xScale = d3.scaleLinear()
+                .domain(d3.extent(aggregatedData, d => d.year))
+                .range([0, width]);
+
+            const yScale = d3.scaleLinear()
+                .domain([0, d3.max(aggregatedData, d => Math.max(d.na, d.eu)) * 1.1])
+                .range([height, 0]);
+
+            // Grid lines
+            const yAxisGrid = d3.axisLeft(yScale)
+                .ticks(8)
+                .tickSize(-width)
+                .tickFormat("");
+
+            svg.append("g")
+                .attr("class", "grid-line")
+                .call(yAxisGrid);
+
+            // X Axis - rotate labels to prevent overlap
+            const xAxis = svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale).tickFormat(d3.format("d")).ticks(Math.min(12, aggregatedData.length)))
+                .attr("class", "axis");
+            
+            // Rotate x-axis labels
+            xAxis.selectAll("text")
+                .style("text-anchor", "end")
+                .attr("dx", "-.8em")
+                .attr("dy", ".15em")
+                .attr("transform", "rotate(-45)");
+
+            // Y Axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale).tickFormat(d => d + "M"))
+                .attr("class", "axis");
+
+            // Axis labels
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .attr("class", "axis-label")
+                .text("Sales (Millions)");
+
+            svg.append("text")
+                .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 20})`)
+                .style("text-anchor", "middle")
+                .attr("class", "axis-label")
+                .text("Year");
+
+            // Line generator
+            const lineNA = d3.line()
+                .x(d => xScale(d.year))
+                .y(d => yScale(d.na))
+                .curve(d3.curveMonotoneX);
+
+            const lineEU = d3.line()
+                .x(d => xScale(d.year))
+                .y(d => yScale(d.eu))
+                .curve(d3.curveMonotoneX);
+
+            // Add lines
+            svg.append("path")
+                .datum(aggregatedData)
+                .attr("class", "line line-na")
+                .attr("d", lineNA);
+
+            svg.append("path")
+                .datum(aggregatedData)
+                .attr("class", "line line-eu")
+                .attr("d", lineEU);
+
+            // Add circles for data points
+            svg.selectAll(".dot-na")
+                .data(aggregatedData)
+                .enter().append("circle")
+                .attr("class", "dot-na")
+                .attr("cx", d => xScale(d.year))
+                .attr("cy", d => yScale(d.na))
+                .attr("r", 4)
+                .attr("fill", "#4A90E2")
+                .on("mouseover", function(event, d) {
+                    tooltip.style("opacity", 1)
+                        .html(`Year: ${d.year}<br>NA Sales: ${d.na.toFixed(2)}M`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("opacity", 0);
+                });
+
+            svg.selectAll(".dot-eu")
+                .data(aggregatedData)
+                .enter().append("circle")
+                .attr("class", "dot-eu")
+                .attr("cx", d => xScale(d.year))
+                .attr("cy", d => yScale(d.eu))
+                .attr("r", 4)
+                .attr("fill", "#E24A4A")
+                .on("mouseover", function(event, d) {
+                    tooltip.style("opacity", 1)
+                        .html(`Year: ${d.year}<br>EU Sales: ${d.eu.toFixed(2)}M`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("opacity", 0);
+                });
+
+            // Legend
+            const legend = d3.select("#line-legend");
+            legend.append("div")
+                .attr("class", "legend-item")
+                .html('<div class="legend-color" style="background: #4A90E2;"></div><span>North America</span>');
+            legend.append("div")
+                .attr("class", "legend-item")
+                .html('<div class="legend-color" style="background: #E24A4A;"></div><span>Europe</span>');
+        }
+
+        function createStackedBarChart(data) {
+            // Get responsive dimensions
+            const { margin, width, height, containerWidth } = getChartDimensions();
+            
+            // Aggregate data by year and region
+            const yearData = d3.rollup(data,
+                v => ({
+                    na: d3.sum(v, d => d.NA_Sales),
+                    eu: d3.sum(v, d => d.EU_Sales),
+                    jp: d3.sum(v, d => d.JP_Sales),
+                    other: d3.sum(v, d => d.Other_Sales)
+                }),
+                d => d.Year
+            );
+
+            const aggregatedData = Array.from(yearData, ([year, sales]) => ({
+                year: year,
+                na: sales.na,
+                eu: sales.eu,
+                jp: sales.jp,
+                other: sales.other,
+                total: sales.na + sales.eu + sales.jp + sales.other
+            })).sort((a, b) => a.year - b.year);
+
+            const svgWidth = width + margin.left + margin.right;
+            const svgHeight = height + margin.top + margin.bottom;
+
+            // Create SVG - use 100% width to fill container
+            const svg = d3.select("#bar-chart")
+                .append("svg")
+                .attr("width", "100%")
+                .attr("height", svgHeight)
+                .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Stack the data
+            const stack = d3.stack()
+                .keys(["na", "eu", "jp", "other"])
+                .order(d3.stackOrderNone)
+                .offset(d3.stackOffsetNone);
+
+            const stackedData = stack(aggregatedData);
+
+            // Scales
+            const xScale = d3.scaleBand()
+                .domain(aggregatedData.map(d => d.year))
+                .range([0, width])
+                .padding(0.2);
+
+            const yScale = d3.scaleLinear()
+                .domain([0, d3.max(aggregatedData, d => d.total) * 1.1])
+                .range([height, 0]);
+
+            // Color scale
+            const color = d3.scaleOrdinal()
+                .domain(["na", "eu", "jp", "other"])
+                .range(["#4A90E2", "#50C878", "#FF6B6B", "#FFD93D"]);
+
+            // Grid lines
+            const yAxisGrid = d3.axisLeft(yScale)
+                .ticks(8)
+                .tickSize(-width)
+                .tickFormat("");
+
+            svg.append("g")
+                .attr("class", "grid-line")
+                .call(yAxisGrid);
+
+            // X Axis - show every 5th year or fewer ticks if needed
+            const xTicks = aggregatedData.length > 20 
+                ? xScale.domain().filter((d, i) => !(i % 5))
+                : xScale.domain();
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale).tickValues(xTicks))
+                .attr("class", "axis")
+                .selectAll("text")
+                .style("text-anchor", "end")
+                .attr("dx", "-.8em")
+                .attr("dy", ".15em")
+                .attr("transform", "rotate(-45)");
+
+            // Y Axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale).tickFormat(d => d + "M"))
+                .attr("class", "axis");
+
+            // Axis labels
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .attr("class", "axis-label")
+                .text("Sales (Millions)");
+
+            svg.append("text")
+                .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 20})`)
+                .style("text-anchor", "middle")
+                .attr("class", "axis-label")
+                .text("Year");
+
+            // Create groups for each stack layer
+            const groups = svg.selectAll(".layer")
+                .data(stackedData)
+                .enter()
+                .append("g")
+                .attr("class", "layer")
+                .attr("fill", d => color(d.key));
+
+            // Create rectangles
+            groups.selectAll("rect")
+                .data(d => d)
+                .enter()
+                .append("rect")
+                .attr("class", "bar")
+                .attr("x", d => xScale(d.data.year))
+                .attr("y", d => yScale(d[1]))
+                .attr("height", d => yScale(d[0]) - yScale(d[1]))
+                .attr("width", xScale.bandwidth())
+                .on("mouseover", function(event, d) {
+                    const region = d3.select(this.parentNode).datum().key;
+                    const regionNames = {
+                        na: "North America",
+                        eu: "Europe",
+                        jp: "Japan",
+                        other: "Other"
+                    };
+                    tooltip.style("opacity", 1)
+                        .html(`Year: ${d.data.year}<br>${regionNames[region]}: ${(d[1] - d[0]).toFixed(2)}M<br>Total: ${d.data.total.toFixed(2)}M`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("opacity", 0);
+                });
+
+            // Legend
+            const legend = d3.select("#bar-legend");
+            const regions = [
+                { key: "na", name: "North America", color: "#4A90E2" },
+                { key: "eu", name: "Europe", color: "#50C878" },
+                { key: "jp", name: "Japan", color: "#FF6B6B" },
+                { key: "other", name: "Other", color: "#FFD93D" }
+            ];
+
+            regions.forEach(region => {
+                legend.append("div")
+                    .attr("class", "legend-item")
+                    .html(`<div class="legend-color" style="background: ${region.color};"></div><span>${region.name}</span>`);
+            });
+        }
+    </script>
+</body>
+</html>
+
