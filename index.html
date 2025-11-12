@@ -236,13 +236,73 @@
             font-size: 1.1em;
         }
 
+        .select-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            gap: 20px;
+        }
+
+        .select-label {
+            min-width: 120px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .select-wrapper {
+            flex: 1;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        select:hover {
+            border-color: #667eea;
+        }
+
+        select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .heatmap-cell {
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .heatmap-cell:hover {
+            opacity: 0.8;
+            stroke: #333;
+            stroke-width: 2;
+        }
+
+        .area {
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .area:hover {
+            opacity: 0.9;
+        }
+
         @media (max-width: 768px) {
-            .slider-group {
+            .slider-group, .select-group {
                 flex-direction: column;
                 align-items: stretch;
             }
             
-            .slider-label {
+            .slider-label, .select-label {
                 min-width: auto;
             }
         }
@@ -270,6 +330,14 @@
                     <span class="slider-value" id="maxYearValue">2020</span>
                 </div>
             </div>
+            <div class="select-group">
+                <label class="select-label">Genre Filter:</label>
+                <div class="select-wrapper">
+                    <select id="genreSelector">
+                        <option value="all">All Genres</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
         <!-- Dual Line Chart -->
@@ -286,6 +354,29 @@
             <p class="chart-description">Stacked bar chart showing sales by region over time</p>
             <div id="bar-chart"></div>
             <div class="legend" id="bar-legend"></div>
+        </div>
+
+        <!-- Genre by Region Bar Chart -->
+        <div class="chart-container" id="genre-bar-chart-container">
+            <h2 class="chart-title">Top Genres by Region</h2>
+            <p class="chart-description">Comparing total sales of top genres across different regions</p>
+            <div id="genre-bar-chart"></div>
+            <div class="legend" id="genre-bar-legend"></div>
+        </div>
+
+        <!-- Genre Heatmap -->
+        <div class="chart-container" id="genre-heatmap-container">
+            <h2 class="chart-title">Genre Performance Heatmap</h2>
+            <p class="chart-description">Heatmap showing sales intensity by genre and region</p>
+            <div id="genre-heatmap"></div>
+        </div>
+
+        <!-- Genre Trends Over Time -->
+        <div class="chart-container" id="genre-trends-container">
+            <h2 class="chart-title">Genre Trends by Region Over Time</h2>
+            <p class="chart-description">Stacked area chart showing genre composition trends by region</p>
+            <div id="genre-trends-chart"></div>
+            <div class="legend" id="genre-trends-legend"></div>
         </div>
     </div>
 
@@ -346,6 +437,7 @@
         function updateCharts() {
             const minYear = parseInt(document.getElementById('minYearSlider').value);
             const maxYear = parseInt(document.getElementById('maxYearSlider').value);
+            const selectedGenre = document.getElementById('genreSelector').value;
             
             // Update slider value displays
             document.getElementById('minYearValue').textContent = minYear;
@@ -363,18 +455,31 @@
                 return updateCharts();
             }
             
-            // Filter data
-            const filteredData = filterDataByYearRange(fullData, minYear, maxYear);
+            // Filter data by year
+            let filteredData = filterDataByYearRange(fullData, minYear, maxYear);
+            
+            // Filter by genre if not "all"
+            if (selectedGenre !== "all") {
+                filteredData = filteredData.filter(d => d.Genre === selectedGenre);
+            }
             
             // Clear existing charts and legends
             d3.select("#line-chart").selectAll("*").remove();
             d3.select("#bar-chart").selectAll("*").remove();
+            d3.select("#genre-bar-chart").selectAll("*").remove();
+            d3.select("#genre-heatmap").selectAll("*").remove();
+            d3.select("#genre-trends-chart").selectAll("*").remove();
             d3.select("#line-legend").selectAll("*").remove();
             d3.select("#bar-legend").selectAll("*").remove();
+            d3.select("#genre-bar-legend").selectAll("*").remove();
+            d3.select("#genre-trends-legend").selectAll("*").remove();
             
             // Recreate charts with filtered data
             createDualLineChart(filteredData);
             createStackedBarChart(filteredData);
+            createGenreByRegionChart(filteredData);
+            createGenreHeatmap(filteredData);
+            createGenreTrendsChart(filteredData);
         }
 
         // Load and process data
@@ -387,10 +492,21 @@
                 d.JP_Sales = +d.JP_Sales;
                 d.Other_Sales = +d.Other_Sales;
                 d.Global_Sales = +d.Global_Sales;
+                // Genre is already a string, no parsing needed
             });
 
             // Filter out invalid years and store full dataset
-            fullData = data.filter(d => d.Year >= 1980 && d.Year <= 2020 && !isNaN(d.Year));
+            fullData = data.filter(d => d.Year >= 1980 && d.Year <= 2020 && !isNaN(d.Year) && d.Genre);
+            
+            // Get unique genres for dropdown
+            const genres = Array.from(new Set(fullData.map(d => d.Genre))).sort();
+            const genreSelector = document.getElementById('genreSelector');
+            genres.forEach(genre => {
+                const option = document.createElement('option');
+                option.value = genre;
+                option.textContent = genre;
+                genreSelector.appendChild(option);
+            });
             
             // Get year range for sliders
             const years = fullData.map(d => d.Year);
@@ -407,13 +523,13 @@
             document.getElementById('minYearValue').textContent = minYear;
             document.getElementById('maxYearValue').textContent = maxYear;
             
-            // Add event listeners to sliders
+            // Add event listeners to sliders and genre selector
             document.getElementById('minYearSlider').addEventListener('input', updateCharts);
             document.getElementById('maxYearSlider').addEventListener('input', updateCharts);
+            document.getElementById('genreSelector').addEventListener('change', updateCharts);
             
             // Create initial charts with full data
-            createDualLineChart(fullData);
-            createStackedBarChart(fullData);
+            updateCharts();
         }).catch(function(error) {
             console.error("Error loading data:", error);
             d3.select(".container").html("<div class='loading'>Error loading data. Please ensure vgsales.csv is in the same directory.</div>");
@@ -726,6 +842,435 @@
                 legend.append("div")
                     .attr("class", "legend-item")
                     .html(`<div class="legend-color" style="background: ${region.color};"></div><span>${region.name}</span>`);
+            });
+        }
+
+        function createGenreByRegionChart(data) {
+            if (!data || data.length === 0) return;
+
+            // Aggregate sales by genre and region
+            const genreData = d3.rollup(data,
+                v => ({
+                    na: d3.sum(v, d => d.NA_Sales),
+                    eu: d3.sum(v, d => d.EU_Sales),
+                    jp: d3.sum(v, d => d.JP_Sales),
+                    other: d3.sum(v, d => d.Other_Sales),
+                    total: d3.sum(v, d => d.Global_Sales)
+                }),
+                d => d.Genre
+            );
+
+            const aggregatedData = Array.from(genreData, ([genre, sales]) => ({
+                genre: genre,
+                na: sales.na,
+                eu: sales.eu,
+                jp: sales.jp,
+                other: sales.other,
+                total: sales.total
+            })).sort((a, b) => b.total - a.total).slice(0, 10); // Top 10 genres
+
+            const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
+            const svgWidth = width + margin.left + margin.right;
+            const svgHeight = height + margin.top + margin.bottom;
+
+            const svg = d3.select("#genre-bar-chart")
+                .append("svg")
+                .attr("width", svgWidth > containerWidth ? svgWidth : "100%")
+                .attr("height", svgHeight)
+                .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
+                .attr("preserveAspectRatio", svgWidth > containerWidth ? "none" : "xMidYMid meet")
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const regions = ["na", "eu", "jp", "other"];
+            const regionNames = {
+                na: "North America",
+                eu: "Europe",
+                jp: "Japan",
+                other: "Other"
+            };
+
+            const x0 = d3.scaleBand()
+                .domain(aggregatedData.map(d => d.genre))
+                .range([0, width])
+                .padding(0.2);
+
+            const x1 = d3.scaleBand()
+                .domain(regions)
+                .range([0, x0.bandwidth()])
+                .padding(0.05);
+
+            const yScale = d3.scaleLinear()
+                .domain([0, d3.max(aggregatedData, d => Math.max(d.na, d.eu, d.jp, d.other)) * 1.1])
+                .range([height, 0]);
+
+            const color = d3.scaleOrdinal()
+                .domain(regions)
+                .range(["#4A90E2", "#50C878", "#FF6B6B", "#FFD93D"]);
+
+            // Grid lines
+            const yAxisGrid = d3.axisLeft(yScale)
+                .ticks(8)
+                .tickSize(-width)
+                .tickFormat("");
+
+            svg.append("g")
+                .attr("class", "grid-line")
+                .call(yAxisGrid);
+
+            // X Axis
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x0))
+                .attr("class", "axis")
+                .selectAll("text")
+                .style("text-anchor", "end")
+                .attr("dx", "-.8em")
+                .attr("dy", ".15em")
+                .attr("transform", "rotate(-45)");
+
+            // Y Axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale).tickFormat(d => d + "M"))
+                .attr("class", "axis");
+
+            // Axis labels
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .attr("class", "axis-label")
+                .text("Sales (Millions)");
+
+            svg.append("text")
+                .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 20})`)
+                .style("text-anchor", "middle")
+                .attr("class", "axis-label")
+                .text("Genre");
+
+            // Create grouped bars
+            const genreGroups = svg.selectAll(".genre-group")
+                .data(aggregatedData)
+                .enter()
+                .append("g")
+                .attr("class", "genre-group")
+                .attr("transform", d => `translate(${x0(d.genre)},0)`);
+
+            regions.forEach(region => {
+                genreGroups.append("rect")
+                    .attr("class", "bar")
+                    .attr("x", d => x1(region))
+                    .attr("y", d => yScale(d[region]))
+                    .attr("width", x1.bandwidth())
+                    .attr("height", d => height - yScale(d[region]))
+                    .attr("fill", color(region))
+                    .on("mouseover", function(event, d) {
+                        tooltip.style("opacity", 1)
+                            .html(`Genre: ${d.genre}<br>${regionNames[region]}: ${d[region].toFixed(2)}M`)
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 10) + "px");
+                    })
+                    .on("mouseout", function() {
+                        tooltip.style("opacity", 0);
+                    });
+            });
+
+            // Legend
+            const legend = d3.select("#genre-bar-legend");
+            regions.forEach(region => {
+                legend.append("div")
+                    .attr("class", "legend-item")
+                    .html(`<div class="legend-color" style="background: ${color(region)};"></div><span>${regionNames[region]}</span>`);
+            });
+        }
+
+        function createGenreHeatmap(data) {
+            if (!data || data.length === 0) return;
+
+            // Aggregate sales by genre and region
+            const genreData = d3.rollup(data,
+                v => ({
+                    na: d3.sum(v, d => d.NA_Sales),
+                    eu: d3.sum(v, d => d.EU_Sales),
+                    jp: d3.sum(v, d => d.JP_Sales),
+                    other: d3.sum(v, d => d.Other_Sales)
+                }),
+                d => d.Genre
+            );
+
+            const genres = Array.from(genreData.keys()).sort();
+            const regions = [
+                { key: "na", name: "North America" },
+                { key: "eu", name: "Europe" },
+                { key: "jp", name: "Japan" },
+                { key: "other", name: "Other" }
+            ];
+
+            // Prepare heatmap data
+            const heatmapData = [];
+            genres.forEach(genre => {
+                const sales = genreData.get(genre);
+                regions.forEach(region => {
+                    heatmapData.push({
+                        genre: genre,
+                        region: region.key,
+                        regionName: region.name,
+                        sales: sales[region.key]
+                    });
+                });
+            });
+
+            const maxSales = d3.max(heatmapData, d => d.sales);
+            const { margin, width, height, containerWidth } = getChartDimensions();
+            const svgWidth = width + margin.left + margin.right;
+            const svgHeight = Math.max(400, genres.length * 25) + margin.top + margin.bottom;
+
+            const svg = d3.select("#genre-heatmap")
+                .append("svg")
+                .attr("width", svgWidth > containerWidth ? svgWidth : "100%")
+                .attr("height", svgHeight)
+                .attr("viewBox", `0 0 ${svgWidth} ${svgHeight}`)
+                .attr("preserveAspectRatio", svgWidth > containerWidth ? "none" : "xMidYMid meet")
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const xScale = d3.scaleBand()
+                .domain(regions.map(r => r.key))
+                .range([0, width])
+                .padding(0.1);
+
+            const yScale = d3.scaleBand()
+                .domain(genres)
+                .range([0, svgHeight - margin.top - margin.bottom])
+                .padding(0.1);
+
+            const colorScale = d3.scaleSequential(d3.interpolateBlues)
+                .domain([0, maxSales]);
+
+            // X Axis
+            svg.append("g")
+                .attr("transform", `translate(0,${svgHeight - margin.top - margin.bottom})`)
+                .call(d3.axisBottom(xScale).tickFormat(d => regions.find(r => r.key === d).name))
+                .attr("class", "axis");
+
+            // Y Axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale))
+                .attr("class", "axis");
+
+            // Create heatmap cells
+            svg.selectAll(".heatmap-cell")
+                .data(heatmapData)
+                .enter()
+                .append("rect")
+                .attr("class", "heatmap-cell")
+                .attr("x", d => xScale(d.region))
+                .attr("y", d => yScale(d.genre))
+                .attr("width", xScale.bandwidth())
+                .attr("height", yScale.bandwidth())
+                .attr("fill", d => colorScale(d.sales))
+                .on("mouseover", function(event, d) {
+                    tooltip.style("opacity", 1)
+                        .html(`${d.genre}<br>${d.regionName}: ${d.sales.toFixed(2)}M`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("opacity", 0);
+                });
+
+            // Color scale legend (simplified)
+            const legendWidth = 200;
+            const legendHeight = 20;
+            const legendX = width - legendWidth - 10;
+            const legendY = 10;
+
+            const legendScale = d3.scaleLinear()
+                .domain([0, maxSales])
+                .range([0, legendWidth]);
+
+            const legendSvg = svg.append("g")
+                .attr("transform", `translate(${legendX},${legendY})`);
+
+            const legendData = d3.range(0, maxSales, maxSales / 100);
+            legendSvg.selectAll("rect")
+                .data(legendData)
+                .enter()
+                .append("rect")
+                .attr("x", d => legendScale(d))
+                .attr("width", legendWidth / 100)
+                .attr("height", legendHeight)
+                .attr("fill", d => colorScale(d));
+
+            legendSvg.append("text")
+                .attr("x", legendWidth / 2)
+                .attr("y", legendHeight + 15)
+                .style("text-anchor", "middle")
+                .style("font-size", "10px")
+                .text(`Sales (Millions)`);
+
+            legendSvg.append("text")
+                .attr("x", 0)
+                .attr("y", legendHeight / 2 + 3)
+                .style("font-size", "10px")
+                .text("0");
+
+            legendSvg.append("text")
+                .attr("x", legendWidth)
+                .attr("y", legendHeight / 2 + 3)
+                .style("text-anchor", "end")
+                .style("font-size", "10px")
+                .text(maxSales.toFixed(1) + "M");
+        }
+
+        function createGenreTrendsChart(data) {
+            if (!data || data.length === 0) return;
+
+            // Aggregate by year and genre for each region
+            const yearGenreData = d3.rollup(data,
+                v => ({
+                    na: d3.sum(v, d => d.NA_Sales),
+                    eu: d3.sum(v, d => d.EU_Sales),
+                    jp: d3.sum(v, d => d.JP_Sales),
+                    other: d3.sum(v, d => d.Other_Sales)
+                }),
+                d => d.Year,
+                d => d.Genre
+            );
+
+            // Get top genres by total sales
+            const genreTotals = d3.rollup(data,
+                v => d3.sum(v, d => d.Global_Sales),
+                d => d.Genre
+            );
+            const topGenres = Array.from(genreTotals.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 6)
+                .map(d => d[0]);
+
+            const years = Array.from(yearGenreData.keys()).sort((a, b) => a - b);
+            
+            // Prepare data for area chart - show all regions
+            const regions = ["na", "eu", "jp", "other"];
+            const regionNames = {
+                na: "North America",
+                eu: "Europe",
+                jp: "Japan",
+                other: "Other"
+            };
+
+            // Prepare data for all regions
+            const allRegionData = {};
+            regions.forEach(r => {
+                allRegionData[r] = years.map(year => {
+                    const genreSales = yearGenreData.get(year);
+                    const yearData = { year: year };
+                    topGenres.forEach(genre => {
+                        yearData[genre] = genreSales && genreSales.has(genre) 
+                            ? genreSales.get(genre)[r] 
+                            : 0;
+                    });
+                    return yearData;
+                });
+            });
+
+            const { margin, width, height, containerWidth } = getChartDimensions(years.length);
+            const svgWidth = width + margin.left + margin.right;
+            const svgHeight = height + margin.top + margin.bottom;
+            const chartSpacing = 50;
+            const totalHeight = (svgHeight + chartSpacing) * regions.length;
+
+            // Create one combined chart showing all regions for top genres
+            const svg = d3.select("#genre-trends-chart")
+                .append("svg")
+                .attr("width", svgWidth > containerWidth ? svgWidth : "100%")
+                .attr("height", totalHeight)
+                .attr("viewBox", `0 0 ${svgWidth} ${totalHeight}`)
+                .attr("preserveAspectRatio", svgWidth > containerWidth ? "none" : "xMidYMid meet");
+
+            regions.forEach((r, idx) => {
+                const regionData = allRegionData[r];
+                const g = svg.append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top + idx * (svgHeight + chartSpacing)})`);
+
+                // Stack the data
+                const stack = d3.stack()
+                    .keys(topGenres)
+                    .order(d3.stackOrderNone)
+                    .offset(d3.stackOffsetNone);
+
+                const stackedData = stack(regionData);
+
+                const xScale = d3.scaleLinear()
+                    .domain(d3.extent(regionData, d => d.year))
+                    .range([0, width]);
+
+                const yScale = d3.scaleLinear()
+                    .domain([0, d3.max(regionData, d => topGenres.reduce((sum, genre) => sum + (d[genre] || 0), 0)) * 1.1])
+                    .range([height, 0]);
+
+                const color = d3.scaleOrdinal()
+                    .domain(topGenres)
+                    .range(d3.schemeCategory10);
+
+                // Create area generator
+                const area = d3.area()
+                    .x(d => xScale(d.data.year))
+                    .y0(d => yScale(d[0]))
+                    .y1(d => yScale(d[1]))
+                    .curve(d3.curveMonotoneX);
+
+                // Add areas
+                g.selectAll(".area")
+                    .data(stackedData)
+                    .enter()
+                    .append("path")
+                    .attr("class", "area")
+                    .attr("d", area)
+                    .attr("fill", d => color(d.key))
+                    .attr("opacity", 0.7)
+                    .on("mouseover", function(event, d) {
+                        tooltip.style("opacity", 1)
+                            .html(`${regionNames[r]}<br>${d.key}<br>Year: ${d.data.year}<br>Sales: ${(d[1] - d[0]).toFixed(2)}M`)
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 10) + "px");
+                    })
+                    .on("mouseout", function() {
+                        tooltip.style("opacity", 0);
+                    });
+
+                // X Axis
+                g.append("g")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(xScale).tickFormat(d3.format("d")).ticks(Math.min(10, years.length)))
+                    .attr("class", "axis");
+
+                // Y Axis
+                g.append("g")
+                    .call(d3.axisLeft(yScale).tickFormat(d => d + "M"))
+                    .attr("class", "axis");
+
+                // Region label
+                g.append("text")
+                    .attr("x", width / 2)
+                    .attr("y", -10)
+                    .style("text-anchor", "middle")
+                    .style("font-weight", "bold")
+                    .style("font-size", "14px")
+                    .text(regionNames[r]);
+            });
+
+            // Legend
+            const legend = d3.select("#genre-trends-legend");
+            const legendColor = d3.scaleOrdinal()
+                .domain(topGenres)
+                .range(d3.schemeCategory10);
+            topGenres.forEach(genre => {
+                legend.append("div")
+                    .attr("class", "legend-item")
+                    .html(`<div class="legend-color" style="background: ${legendColor(genre)};"></div><span>${genre}</span>`);
             });
         }
     </script>
