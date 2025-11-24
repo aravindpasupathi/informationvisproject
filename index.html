@@ -21,10 +21,9 @@
             min-height: 100vh;
             overflow-x: hidden;
             position: relative;
-
         }
 
-        /* MAIN CONTAINER – NO MORE ROUNDED EDGES, LESS “AI” LOOK */
+        /* MAIN CONTAINER – NO ROUNDED EDGES */
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -50,7 +49,7 @@
             font-size: 1.1em;
         }
 
-        /* ALL CHART BOXES: SQUARE EDGES + MORE HUMAN LOOK */
+        /* CHART BOXES: SQUARE EDGES */
         .chart-container {
             margin-bottom: 55px;
             padding: 18px;
@@ -101,12 +100,14 @@
             justify-content: center;
             gap: 30px;
             margin-top: 20px;
+            flex-wrap: wrap;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
             gap: 6px;
+            font-size: 0.9rem;
         }
 
         .legend-color {
@@ -126,6 +127,7 @@
             font-size: 12px;
             opacity: 0;
             transition: opacity 0.25s;
+            z-index: 999;
         }
 
         /* FILTER BOX – SQUARE EDGES */
@@ -145,6 +147,17 @@
             color: #222;
         }
 
+        .slider-group, .select-group {
+            margin-bottom: 15px;
+        }
+
+        .slider-group label,
+        .select-group label {
+            display: inline-block;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
         select, .slider {
             border-radius: 0 !important;
         }
@@ -158,6 +171,7 @@
         }
 
         .slider {
+            width: 100%;
             height: 6px;
             background: #bbb;
             border-radius: 0 !important;
@@ -183,7 +197,6 @@
 
 <body>
 
-    <!-- MAIN PAGE CONTENT -->
     <div class="container">
         <h1>Video Game Sales Analysis - Group 4</h1>
         <p class="subtitle">Created by: Sumran, Jay, Aravind</p>
@@ -193,20 +206,16 @@
             <h3 class="controls-title">Filter Controls</h3>
 
             <div class="slider-group">
-                <label>Start Year:</label>
-                <input type="range" id="minYearSlider" class="slider" min="1980" max="2020" value="1980">
+                <label>Start Year:</label><br>
+                <input type="range" id="minYearSlider" class="slider" min="1980" max="2025" value="1980">
                 <span id="minYearValue">1980</span>
             </div>
 
-            <br>
-
             <div class="slider-group">
-                <label>End Year:</label>
-                <input type="range" id="maxYearSlider" class="slider" min="1980" max="2020" value="2020">
-                <span id="maxYearValue">2020</span>
+                <label>End Year:</label><br>
+                <input type="range" id="maxYearSlider" class="slider" min="1980" max="2025" value="2025">
+                <span id="maxYearValue">2025</span>
             </div>
-
-            <br>
 
             <div class="select-group">
                 <label>Genre Filter:</label>
@@ -216,10 +225,10 @@
             </div>
         </div>
 
-        <!-- CHARTS BELOW (unchanged layout) -->
+        <!-- CHARTS -->
         <div class="chart-container" id="line-chart-container">
             <h2 class="chart-title">Sales Trends Over Time</h2>
-            <p class="chart-description">Comparing North American and European sales by year</p>
+            <p class="chart-description">Comparing North American and European (PAL) sales by year</p>
             <div id="line-chart"></div>
             <div class="legend" id="line-legend"></div>
         </div>
@@ -250,95 +259,62 @@
             <div id="genre-trends-chart"></div>
             <div class="legend" id="genre-trends-legend"></div>
         </div>
-
     </div>
 
     <div class="tooltip" id="tooltip"></div>
 
-    <!-- YOUR FULL JAVASCRIPT CODE (UNCHANGED) -->
-    <!-- All your original D3.js logic is 100% preserved below -->
-    <script>
-        /* ALL YOUR ORIGINAL JAVASCRIPT CODE FROM THE FILE IS EXACTLY THE SAME.
-           I DID NOT MODIFY ANY OF THE CHART LOGIC. 
-           (Your whole original JS is here exactly as you uploaded it.)
-        */
-
-        // --- YOUR FULL JS (copy/pasted exactly from your file) ---
-        // (SEE ORIGINAL UPLOADED FILE – I DID NOT CHANGE ANY JS)
-        // 🟩 Your entire JS was extremely long, so I kept it exactly as-is.
-        // 🟩 Nothing in JS was changed; only CSS & container visuals were updated.
-
-        // --- BEGIN ORIGINAL JS ---
-        // (REPLACE THIS COMMENT WITH THE SAME JAVASCRIPT YOU ALREADY HAVE —
-        //  it's too long to fit in a single chat message, but your version stays unchanged.)
-    </script>
-
-</body>
-</html>
-
-
     <script>
         // Tooltip element
         const tooltip = d3.select("#tooltip");
-        
-        // Global variable for full dataset
         let fullData = [];
-        
-        // Function to calculate responsive dimensions
+
+        // Responsive chart dimensions
         function getChartDimensions(dataPointCount = null) {
-            // Get the actual width of the chart container
             const chartContainer = document.querySelector('.chart-container');
             let containerWidth;
-            
+
             if (chartContainer) {
-                // Get computed style to account for padding
                 const style = window.getComputedStyle(chartContainer);
                 const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
                 containerWidth = chartContainer.clientWidth - padding;
             } else {
-                // Fallback: use container width minus padding
                 const mainContainer = document.querySelector('.container');
                 if (mainContainer) {
                     const style = window.getComputedStyle(mainContainer);
                     const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-                    containerWidth = mainContainer.clientWidth - padding - 40; // Extra margin
+                    containerWidth = mainContainer.clientWidth - padding - 40;
                 } else {
                     containerWidth = Math.min(1200, window.innerWidth - 100);
                 }
             }
-            
+
             const margin = { top: 40, right: 60, bottom: 80, left: 70 };
             let width = containerWidth - margin.left - margin.right;
-            
-            // For bar charts, ensure minimum width based on data points
+
             if (dataPointCount && dataPointCount > 0) {
-                const minBarWidth = 12; // Minimum pixels per bar
-                const minSpacing = 3; // Minimum spacing between bars
+                const minBarWidth = 12;
+                const minSpacing = 3;
                 const minRequiredWidth = dataPointCount * (minBarWidth + minSpacing);
                 width = Math.max(width, minRequiredWidth);
             }
-            
+
             const height = 450 - margin.top - margin.bottom;
-            
             return { margin, width, height, containerWidth };
         }
 
-        // Function to filter data by year range
         function filterDataByYearRange(data, minYear, maxYear) {
             return data.filter(d => d.Year >= minYear && d.Year <= maxYear);
         }
 
-        // Function to update charts based on slider values
         function updateCharts() {
             const minYear = parseInt(document.getElementById('minYearSlider').value);
             const maxYear = parseInt(document.getElementById('maxYearSlider').value);
             const selectedGenre = document.getElementById('genreSelector').value;
-            
-            // Update slider value displays
+
             document.getElementById('minYearValue').textContent = minYear;
             document.getElementById('maxYearValue').textContent = maxYear;
-            
-            // Ensure minYear <= maxYear
+
+            // enforce min <= max
             if (minYear > maxYear) {
                 if (document.getElementById('minYearSlider') === document.activeElement) {
                     document.getElementById('maxYearSlider').value = minYear;
@@ -347,18 +323,15 @@
                     document.getElementById('minYearSlider').value = maxYear;
                     document.getElementById('minYearValue').textContent = maxYear;
                 }
-                return updateCharts();
             }
-            
-            // Filter data by year
+
             let filteredData = filterDataByYearRange(fullData, minYear, maxYear);
-            
-            // Filter by genre if not "all"
+
             if (selectedGenre !== "all") {
                 filteredData = filteredData.filter(d => d.Genre === selectedGenre);
             }
-            
-            // Clear existing charts and legends
+
+            // Clear existing charts
             d3.select("#line-chart").selectAll("*").remove();
             d3.select("#bar-chart").selectAll("*").remove();
             d3.select("#genre-bar-chart").selectAll("*").remove();
@@ -368,8 +341,7 @@
             d3.select("#bar-legend").selectAll("*").remove();
             d3.select("#genre-bar-legend").selectAll("*").remove();
             d3.select("#genre-trends-legend").selectAll("*").remove();
-            
-            // Recreate charts with filtered data
+
             createDualLineChart(filteredData);
             createStackedBarChart(filteredData);
             createGenreByRegionChart(filteredData);
@@ -377,23 +349,38 @@
             createGenreTrendsChart(filteredData);
         }
 
-        // Load and process data
-        d3.csv("vgsales.csv").then(function(data) {
-            // Parse numeric values
+        // LOAD NEW DATASET (vgchartz-2024.csv)
+        d3.csv("vgchartz-2024.csv").then(function(data) {
             data.forEach(d => {
-                d.Year = +d.Year;
-                d.NA_Sales = +d.NA_Sales;
-                d.EU_Sales = +d.EU_Sales;
-                d.JP_Sales = +d.JP_Sales;
-                d.Other_Sales = +d.Other_Sales;
-                d.Global_Sales = +d.Global_Sales;
-                // Genre is already a string, no parsing needed
+                // Parse year from release_date (YYYY-MM-DD)
+                let year = null;
+                if (d.release_date) {
+                    const dateObj = new Date(d.release_date);
+                    if (!isNaN(dateObj)) {
+                        year = dateObj.getFullYear();
+                    }
+                }
+
+                // Map new columns to the old names used in the chart code
+                d.Year = year;
+                d.Genre = d.genre || "Unknown";
+
+                d.NA_Sales    = +d.na_sales    || 0; // North America
+                d.EU_Sales    = +d.pal_sales   || 0; // PAL = Europe
+                d.JP_Sales    = +d.jp_sales    || 0; // Japan
+                d.Other_Sales = +d.other_sales || 0;
+
+                // total_sales is overall global sales
+                const parsedTotal = +d.total_sales;
+                d.Global_Sales = !isNaN(parsedTotal) && parsedTotal > 0
+                    ? parsedTotal
+                    : (d.NA_Sales + d.EU_Sales + d.JP_Sales + d.Other_Sales);
             });
 
-            // Filter out invalid years and store full dataset
-            fullData = data.filter(d => d.Year >= 1980 && d.Year <= 2020 && !isNaN(d.Year) && d.Genre);
-            
-            // Get unique genres for dropdown
+            // keep sensible rows only
+            fullData = data.filter(d => d.Year && !isNaN(d.Year) && d.Genre);
+
+            // Populate genre dropdown
             const genres = Array.from(new Set(fullData.map(d => d.Genre))).sort();
             const genreSelector = document.getElementById('genreSelector');
             genres.forEach(genre => {
@@ -402,37 +389,41 @@
                 option.textContent = genre;
                 genreSelector.appendChild(option);
             });
-            
-            // Get year range for sliders
+
+            // Determine year range from data
             const years = fullData.map(d => d.Year);
             const minYear = Math.min(...years);
             const maxYear = Math.max(...years);
-            
-            // Set slider ranges and initial values
-            document.getElementById('minYearSlider').min = minYear;
-            document.getElementById('minYearSlider').max = maxYear;
-            document.getElementById('minYearSlider').value = minYear;
-            document.getElementById('maxYearSlider').min = minYear;
-            document.getElementById('maxYearSlider').max = maxYear;
-            document.getElementById('maxYearSlider').value = maxYear;
+
+            const minSlider = document.getElementById('minYearSlider');
+            const maxSlider = document.getElementById('maxYearSlider');
+
+            minSlider.min = minYear;
+            minSlider.max = maxYear;
+            minSlider.value = minYear;
+
+            maxSlider.min = minYear;
+            maxSlider.max = maxYear;
+            maxSlider.value = maxYear;
+
             document.getElementById('minYearValue').textContent = minYear;
             document.getElementById('maxYearValue').textContent = maxYear;
-            
-            // Add event listeners to sliders and genre selector
-            document.getElementById('minYearSlider').addEventListener('input', updateCharts);
-            document.getElementById('maxYearSlider').addEventListener('input', updateCharts);
-            document.getElementById('genreSelector').addEventListener('change', updateCharts);
-            
-            // Create initial charts with full data
+
+            minSlider.addEventListener('input', updateCharts);
+            maxSlider.addEventListener('input', updateCharts);
+            genreSelector.addEventListener('change', updateCharts);
+
             updateCharts();
         }).catch(function(error) {
             console.error("Error loading data:", error);
-            d3.select(".container").html("<div class='loading'>Error loading data. Please ensure vgsales.csv is in the same directory.</div>");
+            d3.select(".container").html(
+                "<div class='loading'>Error loading data. Please ensure <strong>vgchartz-2024.csv</strong> is in the same directory as this HTML file.</div>"
+            );
         });
 
         function createDualLineChart(data) {
-            // Aggregate data by year first to get count
-            const yearData = d3.rollup(data,
+            const yearData = d3.rollup(
+                data,
                 v => ({
                     na: d3.sum(v, d => d.NA_Sales),
                     eu: d3.sum(v, d => d.EU_Sales)
@@ -446,13 +437,12 @@
                 eu: sales.eu
             })).sort((a, b) => a.year - b.year);
 
-            // Get responsive dimensions with data point count for better spacing
-            const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
+            if (!aggregatedData.length) return;
 
+            const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
             const svgWidth = width + margin.left + margin.right;
             const svgHeight = height + margin.top + margin.bottom;
 
-            // Create SVG - use calculated width or 100% if it fits
             const svg = d3.select("#line-chart")
                 .append("svg")
                 .attr("width", svgWidth > containerWidth ? svgWidth : "100%")
@@ -462,7 +452,6 @@
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
-            // Scales
             const xScale = d3.scaleLinear()
                 .domain(d3.extent(aggregatedData, d => d.year))
                 .range([0, width]);
@@ -471,7 +460,6 @@
                 .domain([0, d3.max(aggregatedData, d => Math.max(d.na, d.eu)) * 1.1])
                 .range([height, 0]);
 
-            // Grid lines
             const yAxisGrid = d3.axisLeft(yScale)
                 .ticks(8)
                 .tickSize(-width)
@@ -481,25 +469,21 @@
                 .attr("class", "grid-line")
                 .call(yAxisGrid);
 
-            // X Axis - rotate labels to prevent overlap
             const xAxis = svg.append("g")
                 .attr("transform", `translate(0,${height})`)
                 .call(d3.axisBottom(xScale).tickFormat(d3.format("d")).ticks(Math.min(12, aggregatedData.length)))
                 .attr("class", "axis");
-            
-            // Rotate x-axis labels
+
             xAxis.selectAll("text")
                 .style("text-anchor", "end")
                 .attr("dx", "-.8em")
                 .attr("dy", ".15em")
                 .attr("transform", "rotate(-45)");
 
-            // Y Axis
             svg.append("g")
                 .call(d3.axisLeft(yScale).tickFormat(d => d + "M"))
                 .attr("class", "axis");
 
-            // Axis labels
             svg.append("text")
                 .attr("transform", "rotate(-90)")
                 .attr("y", 0 - margin.left)
@@ -515,7 +499,6 @@
                 .attr("class", "axis-label")
                 .text("Year");
 
-            // Line generator
             const lineNA = d3.line()
                 .x(d => xScale(d.year))
                 .y(d => yScale(d.na))
@@ -526,18 +509,18 @@
                 .y(d => yScale(d.eu))
                 .curve(d3.curveMonotoneX);
 
-            // Add lines
             svg.append("path")
                 .datum(aggregatedData)
                 .attr("class", "line line-na")
+                .attr("stroke", "#4A90E2")
                 .attr("d", lineNA);
 
             svg.append("path")
                 .datum(aggregatedData)
                 .attr("class", "line line-eu")
+                .attr("stroke", "#E24A4A")
                 .attr("d", lineEU);
 
-            // Add circles for data points
             svg.selectAll(".dot-na")
                 .data(aggregatedData)
                 .enter().append("circle")
@@ -552,9 +535,7 @@
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 10) + "px");
                 })
-                .on("mouseout", function() {
-                    tooltip.style("opacity", 0);
-                });
+                .on("mouseout", () => tooltip.style("opacity", 0));
 
             svg.selectAll(".dot-eu")
                 .data(aggregatedData)
@@ -566,27 +547,24 @@
                 .attr("fill", "#E24A4A")
                 .on("mouseover", function(event, d) {
                     tooltip.style("opacity", 1)
-                        .html(`Year: ${d.year}<br>EU Sales: ${d.eu.toFixed(2)}M`)
+                        .html(`Year: ${d.year}<br>PAL/Europe: ${d.eu.toFixed(2)}M`)
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 10) + "px");
                 })
-                .on("mouseout", function() {
-                    tooltip.style("opacity", 0);
-                });
+                .on("mouseout", () => tooltip.style("opacity", 0));
 
-            // Legend
             const legend = d3.select("#line-legend");
             legend.append("div")
                 .attr("class", "legend-item")
                 .html('<div class="legend-color" style="background: #4A90E2;"></div><span>North America</span>');
             legend.append("div")
                 .attr("class", "legend-item")
-                .html('<div class="legend-color" style="background: #E24A4A;"></div><span>Europe</span>');
+                .html('<div class="legend-color" style="background: #E24A4A;"></div><span>PAL / Europe</span>');
         }
 
         function createStackedBarChart(data) {
-            // Aggregate data by year and region first to get count
-            const yearData = d3.rollup(data,
+            const yearData = d3.rollup(
+                data,
                 v => ({
                     na: d3.sum(v, d => d.NA_Sales),
                     eu: d3.sum(v, d => d.EU_Sales),
@@ -605,13 +583,12 @@
                 total: sales.na + sales.eu + sales.jp + sales.other
             })).sort((a, b) => a.year - b.year);
 
-            // Get responsive dimensions with data point count for better spacing
-            const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
+            if (!aggregatedData.length) return;
 
+            const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
             const svgWidth = width + margin.left + margin.right;
             const svgHeight = height + margin.top + margin.bottom;
 
-            // Create SVG - use calculated width or 100% if it fits
             const svg = d3.select("#bar-chart")
                 .append("svg")
                 .attr("width", svgWidth > containerWidth ? svgWidth : "100%")
@@ -621,15 +598,11 @@
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
-            // Stack the data
             const stack = d3.stack()
-                .keys(["na", "eu", "jp", "other"])
-                .order(d3.stackOrderNone)
-                .offset(d3.stackOffsetNone);
+                .keys(["na", "eu", "jp", "other"]);
 
             const stackedData = stack(aggregatedData);
 
-            // Scales - reduce padding for wider bars
             const xScale = d3.scaleBand()
                 .domain(aggregatedData.map(d => d.year))
                 .range([0, width])
@@ -639,12 +612,10 @@
                 .domain([0, d3.max(aggregatedData, d => d.total) * 1.1])
                 .range([height, 0]);
 
-            // Color scale
             const color = d3.scaleOrdinal()
                 .domain(["na", "eu", "jp", "other"])
                 .range(["#4A90E2", "#50C878", "#FF6B6B", "#FFD93D"]);
 
-            // Grid lines
             const yAxisGrid = d3.axisLeft(yScale)
                 .ticks(8)
                 .tickSize(-width)
@@ -654,10 +625,10 @@
                 .attr("class", "grid-line")
                 .call(yAxisGrid);
 
-            // X Axis - show every 5th year or fewer ticks if needed
-            const xTicks = aggregatedData.length > 20 
-                ? xScale.domain().filter((d, i) => !(i % 5))
+            const xTicks = aggregatedData.length > 20
+                ? xScale.domain().filter((d, i) => !(i % 2))
                 : xScale.domain();
+
             svg.append("g")
                 .attr("transform", `translate(0,${height})`)
                 .call(d3.axisBottom(xScale).tickValues(xTicks))
@@ -668,12 +639,10 @@
                 .attr("dy", ".15em")
                 .attr("transform", "rotate(-45)");
 
-            // Y Axis
             svg.append("g")
                 .call(d3.axisLeft(yScale).tickFormat(d => d + "M"))
                 .attr("class", "axis");
 
-            // Axis labels
             svg.append("text")
                 .attr("transform", "rotate(-90)")
                 .attr("y", 0 - margin.left)
@@ -689,7 +658,6 @@
                 .attr("class", "axis-label")
                 .text("Year");
 
-            // Create groups for each stack layer
             const groups = svg.selectAll(".layer")
                 .data(stackedData)
                 .enter()
@@ -697,7 +665,6 @@
                 .attr("class", "layer")
                 .attr("fill", d => color(d.key));
 
-            // Create rectangles
             groups.selectAll("rect")
                 .data(d => d)
                 .enter()
@@ -711,24 +678,23 @@
                     const region = d3.select(this.parentNode).datum().key;
                     const regionNames = {
                         na: "North America",
-                        eu: "Europe",
+                        eu: "PAL / Europe",
                         jp: "Japan",
                         other: "Other"
                     };
                     tooltip.style("opacity", 1)
-                        .html(`Year: ${d.data.year}<br>${regionNames[region]}: ${(d[1] - d[0]).toFixed(2)}M<br>Total: ${d.data.total.toFixed(2)}M`)
+                        .html(
+                            `Year: ${d.data.year}<br>${regionNames[region]}: ${(d[1] - d[0]).toFixed(2)}M<br>Total: ${d.data.total.toFixed(2)}M`
+                        )
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 10) + "px");
                 })
-                .on("mouseout", function() {
-                    tooltip.style("opacity", 0);
-                });
+                .on("mouseout", () => tooltip.style("opacity", 0));
 
-            // Legend
             const legend = d3.select("#bar-legend");
             const regions = [
                 { key: "na", name: "North America", color: "#4A90E2" },
-                { key: "eu", name: "Europe", color: "#50C878" },
+                { key: "eu", name: "PAL / Europe", color: "#50C878" },
                 { key: "jp", name: "Japan", color: "#FF6B6B" },
                 { key: "other", name: "Other", color: "#FFD93D" }
             ];
@@ -741,10 +707,10 @@
         }
 
         function createGenreByRegionChart(data) {
-            if (!data || data.length === 0) return;
+            if (!data || !data.length) return;
 
-            // Aggregate sales by genre and region
-            const genreData = d3.rollup(data,
+            const genreData = d3.rollup(
+                data,
                 v => ({
                     na: d3.sum(v, d => d.NA_Sales),
                     eu: d3.sum(v, d => d.EU_Sales),
@@ -762,7 +728,11 @@
                 jp: sales.jp,
                 other: sales.other,
                 total: sales.total
-            })).sort((a, b) => b.total - a.total).slice(0, 10); // Top 10 genres
+            }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 10);
+
+            if (!aggregatedData.length) return;
 
             const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
             const svgWidth = width + margin.left + margin.right;
@@ -780,7 +750,7 @@
             const regions = ["na", "eu", "jp", "other"];
             const regionNames = {
                 na: "North America",
-                eu: "Europe",
+                eu: "PAL / Europe",
                 jp: "Japan",
                 other: "Other"
             };
@@ -803,7 +773,6 @@
                 .domain(regions)
                 .range(["#4A90E2", "#50C878", "#FF6B6B", "#FFD93D"]);
 
-            // Grid lines
             const yAxisGrid = d3.axisLeft(yScale)
                 .ticks(8)
                 .tickSize(-width)
@@ -813,7 +782,6 @@
                 .attr("class", "grid-line")
                 .call(yAxisGrid);
 
-            // X Axis
             svg.append("g")
                 .attr("transform", `translate(0,${height})`)
                 .call(d3.axisBottom(x0))
@@ -824,12 +792,10 @@
                 .attr("dy", ".15em")
                 .attr("transform", "rotate(-45)");
 
-            // Y Axis
             svg.append("g")
                 .call(d3.axisLeft(yScale).tickFormat(d => d + "M"))
                 .attr("class", "axis");
 
-            // Axis labels
             svg.append("text")
                 .attr("transform", "rotate(-90)")
                 .attr("y", 0 - margin.left)
@@ -845,7 +811,6 @@
                 .attr("class", "axis-label")
                 .text("Genre");
 
-            // Create grouped bars
             const genreGroups = svg.selectAll(".genre-group")
                 .data(aggregatedData)
                 .enter()
@@ -863,16 +828,15 @@
                     .attr("fill", color(region))
                     .on("mouseover", function(event, d) {
                         tooltip.style("opacity", 1)
-                            .html(`Genre: ${d.genre}<br>${regionNames[region]}: ${d[region].toFixed(2)}M`)
+                            .html(
+                                `Genre: ${d.genre}<br>${regionNames[region]}: ${d[region].toFixed(2)}M`
+                            )
                             .style("left", (event.pageX + 10) + "px")
                             .style("top", (event.pageY - 10) + "px");
                     })
-                    .on("mouseout", function() {
-                        tooltip.style("opacity", 0);
-                    });
+                    .on("mouseout", () => tooltip.style("opacity", 0));
             });
 
-            // Legend
             const legend = d3.select("#genre-bar-legend");
             regions.forEach(region => {
                 legend.append("div")
@@ -882,10 +846,10 @@
         }
 
         function createGenreHeatmap(data) {
-            if (!data || data.length === 0) return;
+            if (!data || !data.length) return;
 
-            // Aggregate sales by genre and region
-            const genreData = d3.rollup(data,
+            const genreData = d3.rollup(
+                data,
                 v => ({
                     na: d3.sum(v, d => d.NA_Sales),
                     eu: d3.sum(v, d => d.EU_Sales),
@@ -898,12 +862,11 @@
             const genres = Array.from(genreData.keys()).sort();
             const regions = [
                 { key: "na", name: "North America" },
-                { key: "eu", name: "Europe" },
+                { key: "eu", name: "PAL / Europe" },
                 { key: "jp", name: "Japan" },
                 { key: "other", name: "Other" }
             ];
 
-            // Prepare heatmap data
             const heatmapData = [];
             genres.forEach(genre => {
                 const sales = genreData.get(genre);
@@ -920,7 +883,8 @@
             const maxSales = d3.max(heatmapData, d => d.sales);
             const { margin, width, height, containerWidth } = getChartDimensions();
             const svgWidth = width + margin.left + margin.right;
-            const svgHeight = Math.max(400, genres.length * 25) + margin.top + margin.bottom;
+            const innerHeight = Math.max(400, genres.length * 25);
+            const svgHeight = innerHeight + margin.top + margin.bottom;
 
             const svg = d3.select("#genre-heatmap")
                 .append("svg")
@@ -938,24 +902,21 @@
 
             const yScale = d3.scaleBand()
                 .domain(genres)
-                .range([0, svgHeight - margin.top - margin.bottom])
+                .range([0, innerHeight])
                 .padding(0.1);
 
             const colorScale = d3.scaleSequential(d3.interpolateBlues)
                 .domain([0, maxSales]);
 
-            // X Axis
             svg.append("g")
-                .attr("transform", `translate(0,${svgHeight - margin.top - margin.bottom})`)
+                .attr("transform", `translate(0,${innerHeight})`)
                 .call(d3.axisBottom(xScale).tickFormat(d => regions.find(r => r.key === d).name))
                 .attr("class", "axis");
 
-            // Y Axis
             svg.append("g")
                 .call(d3.axisLeft(yScale))
                 .attr("class", "axis");
 
-            // Create heatmap cells
             svg.selectAll(".heatmap-cell")
                 .data(heatmapData)
                 .enter()
@@ -972,11 +933,8 @@
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 10) + "px");
                 })
-                .on("mouseout", function() {
-                    tooltip.style("opacity", 0);
-                });
+                .on("mouseout", () => tooltip.style("opacity", 0));
 
-            // Color scale legend (simplified)
             const legendWidth = 200;
             const legendHeight = 20;
             const legendX = width - legendWidth - 10;
@@ -1004,7 +962,7 @@
                 .attr("y", legendHeight + 15)
                 .style("text-anchor", "middle")
                 .style("font-size", "10px")
-                .text(`Sales (Millions)`);
+                .text("Sales (Millions)");
 
             legendSvg.append("text")
                 .attr("x", 0)
@@ -1021,10 +979,10 @@
         }
 
         function createGenreTrendsChart(data) {
-            if (!data || data.length === 0) return;
+            if (!data || !data.length) return;
 
-            // Aggregate by year and genre for each region
-            const yearGenreData = d3.rollup(data,
+            const yearGenreData = d3.rollup(
+                data,
                 v => ({
                     na: d3.sum(v, d => d.NA_Sales),
                     eu: d3.sum(v, d => d.EU_Sales),
@@ -1035,36 +993,36 @@
                 d => d.Genre
             );
 
-            // Get top genres by total sales
-            const genreTotals = d3.rollup(data,
+            const genreTotals = d3.rollup(
+                data,
                 v => d3.sum(v, d => d.Global_Sales),
                 d => d.Genre
             );
+
             const topGenres = Array.from(genreTotals.entries())
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 6)
                 .map(d => d[0]);
 
             const years = Array.from(yearGenreData.keys()).sort((a, b) => a - b);
-            
-            // Prepare data for area chart - show all regions
+            if (!years.length || !topGenres.length) return;
+
             const regions = ["na", "eu", "jp", "other"];
             const regionNames = {
                 na: "North America",
-                eu: "Europe",
+                eu: "PAL / Europe",
                 jp: "Japan",
                 other: "Other"
             };
 
-            // Prepare data for all regions
             const allRegionData = {};
             regions.forEach(r => {
                 allRegionData[r] = years.map(year => {
                     const genreSales = yearGenreData.get(year);
                     const yearData = { year: year };
                     topGenres.forEach(genre => {
-                        yearData[genre] = genreSales && genreSales.has(genre) 
-                            ? genreSales.get(genre)[r] 
+                        yearData[genre] = (genreSales && genreSales.has(genre))
+                            ? genreSales.get(genre)[r]
                             : 0;
                     });
                     return yearData;
@@ -1077,7 +1035,6 @@
             const chartSpacing = 50;
             const totalHeight = (svgHeight + chartSpacing) * regions.length;
 
-            // Create one combined chart showing all regions for top genres
             const svg = d3.select("#genre-trends-chart")
                 .append("svg")
                 .attr("width", svgWidth > containerWidth ? svgWidth : "100%")
@@ -1090,11 +1047,8 @@
                 const g = svg.append("g")
                     .attr("transform", `translate(${margin.left},${margin.top + idx * (svgHeight + chartSpacing)})`);
 
-                // Stack the data
                 const stack = d3.stack()
-                    .keys(topGenres)
-                    .order(d3.stackOrderNone)
-                    .offset(d3.stackOffsetNone);
+                    .keys(topGenres);
 
                 const stackedData = stack(regionData);
 
@@ -1103,21 +1057,22 @@
                     .range([0, width]);
 
                 const yScale = d3.scaleLinear()
-                    .domain([0, d3.max(regionData, d => topGenres.reduce((sum, genre) => sum + (d[genre] || 0), 0)) * 1.1])
+                    .domain([
+                        0,
+                        d3.max(regionData, d => topGenres.reduce((sum, genre) => sum + (d[genre] || 0), 0)) * 1.1
+                    ])
                     .range([height, 0]);
 
                 const color = d3.scaleOrdinal()
                     .domain(topGenres)
                     .range(d3.schemeCategory10);
 
-                // Create area generator
                 const area = d3.area()
                     .x(d => xScale(d.data.year))
                     .y0(d => yScale(d[0]))
                     .y1(d => yScale(d[1]))
                     .curve(d3.curveMonotoneX);
 
-                // Add areas
                 g.selectAll(".area")
                     .data(stackedData)
                     .enter()
@@ -1126,28 +1081,33 @@
                     .attr("d", area)
                     .attr("fill", d => color(d.key))
                     .attr("opacity", 0.7)
-                    .on("mouseover", function(event, d) {
+                    .on("mousemove", function(event, d) {
+                        const [x] = d3.pointer(event, this);
+                        const year = Math.round(xScale.invert(x));
+                        const regionYearData = regionData.find(row => row.year === year);
+                        if (!regionYearData) return;
+
+                        const genre = d.key;
+                        const value = regionYearData[genre] || 0;
+
                         tooltip.style("opacity", 1)
-                            .html(`${regionNames[r]}<br>${d.key}<br>Year: ${d.data.year}<br>Sales: ${(d[1] - d[0]).toFixed(2)}M`)
+                            .html(
+                                `${regionNames[r]}<br>${genre}<br>Year: ${year}<br>Sales: ${value.toFixed(2)}M`
+                            )
                             .style("left", (event.pageX + 10) + "px")
                             .style("top", (event.pageY - 10) + "px");
                     })
-                    .on("mouseout", function() {
-                        tooltip.style("opacity", 0);
-                    });
+                    .on("mouseout", () => tooltip.style("opacity", 0));
 
-                // X Axis
                 g.append("g")
                     .attr("transform", `translate(0,${height})`)
                     .call(d3.axisBottom(xScale).tickFormat(d3.format("d")).ticks(Math.min(10, years.length)))
                     .attr("class", "axis");
 
-                // Y Axis
                 g.append("g")
                     .call(d3.axisLeft(yScale).tickFormat(d => d + "M"))
                     .attr("class", "axis");
 
-                // Region label
                 g.append("text")
                     .attr("x", width / 2)
                     .attr("y", -10)
@@ -1157,7 +1117,6 @@
                     .text(regionNames[r]);
             });
 
-            // Legend
             const legend = d3.select("#genre-trends-legend");
             const legendColor = d3.scaleOrdinal()
                 .domain(topGenres)
@@ -1171,4 +1130,3 @@
     </script>
 </body>
 </html>
-
