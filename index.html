@@ -13,7 +13,7 @@
             box-sizing: border-box;
         }
 
-        /* FULLSCREEN BACKGROUND IMAGE */
+        /* the background image */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: url("background.jpg") center/cover no-repeat fixed;
@@ -23,7 +23,7 @@
             position: relative;
         }
 
-        /* MAIN CONTAINER – NO ROUNDED EDGES */
+        /* this is for cutting out the edges */
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -49,7 +49,7 @@
             font-size: 1.1em;
         }
 
-        /* CHART BOXES: SQUARE EDGES */
+        
         .chart-container {
             margin-bottom: 55px;
             padding: 18px;
@@ -83,7 +83,8 @@
             font-size: 12px;
         }
 
-        .grid-line {
+        .grid-line path,
+        .grid-line line {
             stroke: #d0d0d0;
             stroke-width: 1;
             stroke-dasharray: 3,3;
@@ -130,7 +131,7 @@
             z-index: 999;
         }
 
-        /* FILTER BOX – SQUARE EDGES */
+        
         .controls-container {
             background: rgba(245,245,245,0.92);
             border-radius: 0;
@@ -174,7 +175,6 @@
             width: 100%;
             height: 6px;
             background: #bbb;
-            border-radius: 0 !important;
         }
 
         .slider::-webkit-slider-thumb {
@@ -192,6 +192,50 @@
             border-radius: 0;
             cursor: pointer;
         }
+
+        .loading {
+            text-align: center;
+            font-size: 1.2em;
+            padding: 40px;
+            color: #222;
+        }
+
+        
+        #mapChart {
+            width: 100%;
+            height: 520px;
+        }
+
+        #platform-heatmap {
+            overflow-x: auto;
+            border: 1px solid #c8c8c8;
+            background: #fff;
+            padding: 10px;
+        }
+
+        #platform-heatmap table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        #platform-heatmap th,
+        #platform-heatmap td {
+            padding: 6px 10px;
+            text-align: center;
+            border: 1px solid #bbb;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        #platform-heatmap th {
+            background: #eee;
+            font-weight: 600;
+        }
+
+        #region-select {
+            font-size: 16px;
+            padding: 6px;
+        }
     </style>
 </head>
 
@@ -201,7 +245,7 @@
         <h1>Video Game Sales Analysis - Group 4</h1>
         <p class="subtitle">Created by: Sumran, Jay, Aravind</p>
 
-        <!-- FILTER CONTROLS -->
+        
         <div class="controls-container">
             <h3 class="controls-title">Filter Controls</h3>
 
@@ -225,10 +269,10 @@
             </div>
         </div>
 
-        <!-- CHARTS -->
+        
         <div class="chart-container" id="line-chart-container">
-            <h2 class="chart-title">Sales Trends Over Time</h2>
-            <p class="chart-description">Comparing North American and European (PAL) sales by year</p>
+            <h2 class="chart-title">Sales Trends Over Time (Smoothed)</h2>
+            <p class="chart-description">3-year rolling average of North American and European (PAL) sales by year</p>
             <div id="line-chart"></div>
             <div class="legend" id="line-legend"></div>
         </div>
@@ -254,21 +298,48 @@
         </div>
 
         <div class="chart-container" id="genre-trends-container">
-            <h2 class="chart-title">Genre Trends by Region Over Time</h2>
-            <p class="chart-description">Stacked area chart showing genre composition trends by region</p>
+            <h2 class="chart-title">Top Genre Composition by Region Over Time</h2>
+            <p class="chart-description">Stacked area chart showing composition of top genres by region</p>
             <div id="genre-trends-chart"></div>
             <div class="legend" id="genre-trends-legend"></div>
+        </div>
+
+        
+        <div class="chart-container" id="regional-map-container">
+            <h2 class="chart-title">Choropleth Map – Regional Sales</h2>
+            <p class="chart-description">Total video game sales by region using the same dataset</p>
+            <div id="mapChart"></div>
+        </div>
+
+        
+        <div class="chart-container" id="platform-genre-heatmap-container">
+            <h2 class="chart-title">Genre × Platform Heatmap</h2>
+            <p class="chart-description">Detailed Breakdown</p>
+
+            <div style="text-align:center; margin-bottom: 10px;">
+                <label><b>Region:</b></label>
+                <select id="region-select">
+                    <option value="NA_Sales">North America</option>
+                    <option value="EU_Sales">PAL / Europe</option>
+                    <option value="JP_Sales">Japan</option>
+                    <option value="Other_Sales">Other</option>
+                </select>
+            </div>
+
+            <div id="platform-heatmap"></div>
         </div>
     </div>
 
     <div class="tooltip" id="tooltip"></div>
 
     <script>
-        // Tooltip element
+        
         const tooltip = d3.select("#tooltip");
         let fullData = [];
 
-        // Responsive chart dimensions
+        
+
+        
         function getChartDimensions(dataPointCount = null) {
             const chartContainer = document.querySelector('.chart-container');
             let containerWidth;
@@ -306,24 +377,46 @@
             return data.filter(d => d.Year >= minYear && d.Year <= maxYear);
         }
 
+        
+        function applyRollingAverage(data, keys, windowSize = 3) {
+            if (!data.length) return data;
+            const sorted = data.slice().sort((a, b) => a.year - b.year);
+            return sorted.map((d, i) => {
+                const start = Math.max(0, i - windowSize + 1);
+                const window = sorted.slice(start, i + 1);
+                const smoothed = { ...d };
+                keys.forEach(k => {
+                    const sum = d3.sum(window, w => w[k]);
+                    smoothed[k] = sum / window.length;
+                });
+                return smoothed;
+            });
+        }
+
+        
+
         function updateCharts() {
-            const minYear = parseInt(document.getElementById('minYearSlider').value);
-            const maxYear = parseInt(document.getElementById('maxYearSlider').value);
-            const selectedGenre = document.getElementById('genreSelector').value;
+            const minYearSlider = document.getElementById('minYearSlider');
+            const maxYearSlider = document.getElementById('maxYearSlider');
+            const genreSelector = document.getElementById('genreSelector');
+
+            let minYear = parseInt(minYearSlider.value);
+            let maxYear = parseInt(maxYearSlider.value);
+            const selectedGenre = genreSelector.value;
+
+            
+            if (minYear > maxYear) {
+                if (document.activeElement === minYearSlider) {
+                    maxYear = minYear;
+                    maxYearSlider.value = maxYear;
+                } else {
+                    minYear = maxYear;
+                    minYearSlider.value = minYear;
+                }
+            }
 
             document.getElementById('minYearValue').textContent = minYear;
             document.getElementById('maxYearValue').textContent = maxYear;
-
-            // enforce min <= max
-            if (minYear > maxYear) {
-                if (document.getElementById('minYearSlider') === document.activeElement) {
-                    document.getElementById('maxYearSlider').value = minYear;
-                    document.getElementById('maxYearValue').textContent = minYear;
-                } else {
-                    document.getElementById('minYearSlider').value = maxYear;
-                    document.getElementById('minYearValue').textContent = maxYear;
-                }
-            }
 
             let filteredData = filterDataByYearRange(fullData, minYear, maxYear);
 
@@ -331,7 +424,7 @@
                 filteredData = filteredData.filter(d => d.Genre === selectedGenre);
             }
 
-            // Clear existing charts
+            
             d3.select("#line-chart").selectAll("*").remove();
             d3.select("#bar-chart").selectAll("*").remove();
             d3.select("#genre-bar-chart").selectAll("*").remove();
@@ -349,38 +442,50 @@
             createGenreTrendsChart(filteredData);
         }
 
-        // LOAD NEW DATASET (vgchartz-2024.csv)
+        
+
         d3.csv("vgchartz-2024.csv").then(function(data) {
             data.forEach(d => {
-                // Parse year from release_date (YYYY-MM-DD)
+                
                 let year = null;
+
                 if (d.release_date) {
                     const dateObj = new Date(d.release_date);
                     if (!isNaN(dateObj)) {
                         year = dateObj.getFullYear();
+                    } else {
+                        const match = d.release_date.match(/(\d{4})/);
+                        if (match) {
+                            year = +match[1];
+                        }
                     }
                 }
 
-                // Map new columns to the old names used in the chart code
                 d.Year = year;
                 d.Genre = d.genre || "Unknown";
 
-                d.NA_Sales    = +d.na_sales    || 0; // North America
-                d.EU_Sales    = +d.pal_sales   || 0; // PAL = Europe
-                d.JP_Sales    = +d.jp_sales    || 0; // Japan
+                d.NA_Sales    = +d.na_sales    || 0;
+                d.EU_Sales    = +d.pal_sales   || 0;
+                d.JP_Sales    = +d.jp_sales    || 0;
                 d.Other_Sales = +d.other_sales || 0;
 
-                // total_sales is overall global sales
                 const parsedTotal = +d.total_sales;
                 d.Global_Sales = !isNaN(parsedTotal) && parsedTotal > 0
                     ? parsedTotal
                     : (d.NA_Sales + d.EU_Sales + d.JP_Sales + d.Other_Sales);
             });
 
-            // keep sensible rows only
-            fullData = data.filter(d => d.Year && !isNaN(d.Year) && d.Genre);
+            
+            fullData = data.filter(d => typeof d.Year === "number" && !isNaN(d.Year) && d.Genre);
 
-            // Populate genre dropdown
+            if (!fullData.length) {
+                d3.select(".container").html(
+                    "<div class='loading'>No valid data after parsing years. Check <strong>release_date</strong> in vgchartz-2024.csv.</div>"
+                );
+                return;
+            }
+
+            
             const genres = Array.from(new Set(fullData.map(d => d.Genre))).sort();
             const genreSelector = document.getElementById('genreSelector');
             genres.forEach(genre => {
@@ -390,7 +495,7 @@
                 genreSelector.appendChild(option);
             });
 
-            // Determine year range from data
+            
             const years = fullData.map(d => d.Year);
             const minYear = Math.min(...years);
             const maxYear = Math.max(...years);
@@ -409,17 +514,25 @@
             document.getElementById('minYearValue').textContent = minYear;
             document.getElementById('maxYearValue').textContent = maxYear;
 
+            
             minSlider.addEventListener('input', updateCharts);
             maxSlider.addEventListener('input', updateCharts);
             genreSelector.addEventListener('change', updateCharts);
 
+            
             updateCharts();
+
+            
+            createRegionalMap(fullData);
+            initPlatformHeatmap(fullData);
         }).catch(function(error) {
             console.error("Error loading data:", error);
             d3.select(".container").html(
                 "<div class='loading'>Error loading data. Please ensure <strong>vgchartz-2024.csv</strong> is in the same directory as this HTML file.</div>"
             );
         });
+
+       
 
         function createDualLineChart(data) {
             const yearData = d3.rollup(
@@ -431,13 +544,15 @@
                 d => d.Year
             );
 
-            const aggregatedData = Array.from(yearData, ([year, sales]) => ({
-                year: year,
+            let aggregatedData = Array.from(yearData, ([year, sales]) => ({
+                year: +year,
                 na: sales.na,
                 eu: sales.eu
             })).sort((a, b) => a.year - b.year);
 
             if (!aggregatedData.length) return;
+
+            const smoothedData = applyRollingAverage(aggregatedData, ["na", "eu"], 3);
 
             const { margin, width, height, containerWidth } = getChartDimensions(aggregatedData.length);
             const svgWidth = width + margin.left + margin.right;
@@ -453,11 +568,12 @@
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
             const xScale = d3.scaleLinear()
-                .domain(d3.extent(aggregatedData, d => d.year))
+                .domain(d3.extent(smoothedData, d => d.year))
                 .range([0, width]);
 
             const yScale = d3.scaleLinear()
-                .domain([0, d3.max(aggregatedData, d => Math.max(d.na, d.eu)) * 1.1])
+                .domain([0, d3.max(smoothedData, d => Math.max(d.na, d.eu)) * 1.1])
+                .nice()
                 .range([height, 0]);
 
             const yAxisGrid = d3.axisLeft(yScale)
@@ -471,7 +587,11 @@
 
             const xAxis = svg.append("g")
                 .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(xScale).tickFormat(d3.format("d")).ticks(Math.min(12, aggregatedData.length)))
+                .call(
+                    d3.axisBottom(xScale)
+                        .tickFormat(d3.format("d"))
+                        .ticks(Math.min(12, smoothedData.length))
+                )
                 .attr("class", "axis");
 
             xAxis.selectAll("text")
@@ -510,19 +630,19 @@
                 .curve(d3.curveMonotoneX);
 
             svg.append("path")
-                .datum(aggregatedData)
+                .datum(smoothedData)
                 .attr("class", "line line-na")
                 .attr("stroke", "#4A90E2")
                 .attr("d", lineNA);
 
             svg.append("path")
-                .datum(aggregatedData)
+                .datum(smoothedData)
                 .attr("class", "line line-eu")
                 .attr("stroke", "#E24A4A")
                 .attr("d", lineEU);
 
             svg.selectAll(".dot-na")
-                .data(aggregatedData)
+                .data(smoothedData)
                 .enter().append("circle")
                 .attr("class", "dot-na")
                 .attr("cx", d => xScale(d.year))
@@ -531,14 +651,14 @@
                 .attr("fill", "#4A90E2")
                 .on("mouseover", function(event, d) {
                     tooltip.style("opacity", 1)
-                        .html(`Year: ${d.year}<br>NA Sales: ${d.na.toFixed(2)}M`)
+                        .html(`Year: ${d.year}<br>NA (smoothed): ${d.na.toFixed(2)}M`)
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 10) + "px");
                 })
                 .on("mouseout", () => tooltip.style("opacity", 0));
 
             svg.selectAll(".dot-eu")
-                .data(aggregatedData)
+                .data(smoothedData)
                 .enter().append("circle")
                 .attr("class", "dot-eu")
                 .attr("cx", d => xScale(d.year))
@@ -547,7 +667,7 @@
                 .attr("fill", "#E24A4A")
                 .on("mouseover", function(event, d) {
                     tooltip.style("opacity", 1)
-                        .html(`Year: ${d.year}<br>PAL/Europe: ${d.eu.toFixed(2)}M`)
+                        .html(`Year: ${d.year}<br>PAL/Europe (smoothed): ${d.eu.toFixed(2)}M`)
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 10) + "px");
                 })
@@ -556,10 +676,10 @@
             const legend = d3.select("#line-legend");
             legend.append("div")
                 .attr("class", "legend-item")
-                .html('<div class="legend-color" style="background: #4A90E2;"></div><span>North America</span>');
+                .html('<div class="legend-color" style="background: #4A90E2;"></div><span>North America (3-year avg)</span>');
             legend.append("div")
                 .attr("class", "legend-item")
-                .html('<div class="legend-color" style="background: #E24A4A;"></div><span>PAL / Europe</span>');
+                .html('<div class="legend-color" style="background: #E24A4A;"></div><span>PAL / Europe (3-year avg)</span>');
         }
 
         function createStackedBarChart(data) {
@@ -575,7 +695,7 @@
             );
 
             const aggregatedData = Array.from(yearData, ([year, sales]) => ({
-                year: year,
+                year: +year,
                 na: sales.na,
                 eu: sales.eu,
                 jp: sales.jp,
@@ -610,6 +730,7 @@
 
             const yScale = d3.scaleLinear()
                 .domain([0, d3.max(aggregatedData, d => d.total) * 1.1])
+                .nice()
                 .range([height, 0]);
 
             const color = d3.scaleOrdinal()
@@ -767,6 +888,7 @@
 
             const yScale = d3.scaleLinear()
                 .domain([0, d3.max(aggregatedData, d => Math.max(d.na, d.eu, d.jp, d.other)) * 1.1])
+                .nice()
                 .range([height, 0]);
 
             const color = d3.scaleOrdinal()
@@ -875,12 +997,14 @@
                         genre: genre,
                         region: region.key,
                         regionName: region.name,
-                        sales: sales[region.key]
+                        sales: sales ? sales[region.key] : 0
                     });
                 });
             });
 
-            const maxSales = d3.max(heatmapData, d => d.sales);
+            const maxSales = d3.max(heatmapData, d => d.sales) || 0;
+            if (!maxSales) return;
+
             const { margin, width, height, containerWidth } = getChartDimensions();
             const svgWidth = width + margin.left + margin.right;
             const innerHeight = Math.max(400, genres.length * 25);
@@ -1004,7 +1128,7 @@
                 .slice(0, 6)
                 .map(d => d[0]);
 
-            const years = Array.from(yearGenreData.keys()).sort((a, b) => a - b);
+            const years = Array.from(yearGenreData.keys()).map(y => +y).sort((a, b) => a - b);
             if (!years.length || !topGenres.length) return;
 
             const regions = ["na", "eu", "jp", "other"];
@@ -1044,6 +1168,7 @@
 
             regions.forEach((r, idx) => {
                 const regionData = allRegionData[r];
+
                 const g = svg.append("g")
                     .attr("transform", `translate(${margin.left},${margin.top + idx * (svgHeight + chartSpacing)})`);
 
@@ -1061,6 +1186,7 @@
                         0,
                         d3.max(regionData, d => topGenres.reduce((sum, genre) => sum + (d[genre] || 0), 0)) * 1.1
                     ])
+                    .nice()
                     .range([height, 0]);
 
                 const color = d3.scaleOrdinal()
@@ -1121,11 +1247,165 @@
             const legendColor = d3.scaleOrdinal()
                 .domain(topGenres)
                 .range(d3.schemeCategory10);
+
             topGenres.forEach(genre => {
                 legend.append("div")
                     .attr("class", "legend-item")
                     .html(`<div class="legend-color" style="background: ${legendColor(genre)};"></div><span>${genre}</span>`);
             });
+        }
+
+        
+
+        function createRegionalMap(data) {
+            const totals = {
+                na: d3.sum(data, d => d.NA_Sales),
+                eu: d3.sum(data, d => d.EU_Sales),
+                jp: d3.sum(data, d => d.JP_Sales),
+                other: d3.sum(data, d => d.Other_Sales)
+            };
+
+            d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson")
+                .then(world => {
+                    const countries = world.features;
+
+                    const regionMap = {};
+                    countries.forEach(c => regionMap[c.id] = "Other");
+
+                    regionMap["USA"] = "North America";
+                    regionMap["CAN"] = "North America";
+                    regionMap["JPN"] = "Japan";
+
+                    const euList = ["GBR","FRA","DEU","ESP","ITA","NLD","SWE","NOR","FIN","DNK",
+                                    "POL","CHE","AUT","BEL","IRL","PRT","GRC","CZE","HUN","ROU","BGR"];
+                    euList.forEach(c => regionMap[c] = "PAL / Europe");
+
+                    const max = d3.max(Object.values(totals));
+
+                    const colorScale = d3.scaleLinear()
+                        .domain([0, max])
+                        .range(["#d7e7ff", "#003366"]);
+
+                    const width = document.getElementById("mapChart").clientWidth || 800;
+                    const height = 520;
+
+                    const svg = d3.select("#mapChart").append("svg")
+                        .attr("width", width)
+                        .attr("height", height);
+
+                    const projection = d3.geoMercator()
+                        .scale(width / 2 / Math.PI)
+                        .translate([width / 2, height / 1.55]);
+
+                    const path = d3.geoPath().projection(projection);
+
+                    svg.selectAll("path")
+                        .data(countries)
+                        .enter()
+                        .append("path")
+                        .attr("d", path)
+                        .attr("fill", d => {
+                            const r = regionMap[d.id];
+                            return colorScale(
+                                r === "North America" ? totals.na :
+                                r === "PAL / Europe" ? totals.eu :
+                                r === "Japan" ? totals.jp :
+                                totals.other
+                            );
+                        })
+                        .attr("stroke", "#fff")
+                        .on("mousemove", (event,d) => {
+                            const r = regionMap[d.id];
+                            const val =
+                                r === "North America" ? totals.na :
+                                r === "PAL / Europe" ? totals.eu :
+                                r === "Japan" ? totals.jp :
+                                totals.other;
+
+                            tooltip.style("opacity", 1)
+                                .html(`<b>${r}</b><br>${val.toFixed(2)}M`)
+                                .style("left", event.pageX + 10 + "px")
+                                .style("top", event.pageY - 20 + "px");
+                        })
+                        .on("mouseout", () => tooltip.style("opacity", 0));
+                });
+        }
+
+        function initPlatformHeatmap(data) {
+            const regionSelect = d3.select("#region-select");
+
+            function update(regionField) {
+                d3.select("#platform-heatmap").html("");
+
+                const genres = [...new Set(data.map(d => d.Genre))].sort();
+
+                let platforms = [...new Set(
+                    data.filter(d => d[regionField] > 0).map(d => d.console)
+                )];
+                platforms.sort();
+
+                let globalMax = 0;
+                const matrix = genres.map(g => {
+                    const row = { genre: g };
+
+                    platforms.forEach(p => {
+                        const sum = d3.sum(
+                            data.filter(x => x.Genre === g && x.console === p),
+                            x => x[regionField]
+                        );
+                        row[p] = sum;
+                        if (sum > globalMax) globalMax = sum;
+                    });
+
+                    return row;
+                });
+
+                const finalMatrix = matrix.filter(r =>
+                    platforms.some(p => r[p] > 0)
+                );
+
+                const color = d3.scaleLinear()
+                    .domain([0, globalMax])
+                    .range(["#dce6ff", "#000000"]);
+
+                const table = d3.select("#platform-heatmap").append("table");
+                const thead = table.append("thead").append("tr");
+
+                thead.append("th").text("Genre");
+                platforms.forEach(p => thead.append("th").text(p));
+
+                const tbody = table.append("tbody");
+
+                finalMatrix.forEach(row => {
+                    const tr = tbody.append("tr");
+                    tr.append("td").text(row.genre);
+
+                    platforms.forEach(p => {
+                        const val = row[p];
+                        const bg = color(val);
+
+                        const rgb = d3.rgb(bg);
+                        const brightness =
+                            rgb.r * 0.299 +
+                            rgb.g * 0.587 +
+                            rgb.b * 0.114;
+
+                        const textColor = brightness < 120 ? "yellow" : "black";
+
+                        tr.append("td")
+                            .style("background", bg)
+                            .style("color", textColor)
+                            .text(val > 0 ? val.toFixed(2) : "");
+                    });
+                });
+            }
+
+            regionSelect.on("change", function () {
+                update(this.value);
+            });
+
+            
+            update("NA_Sales");
         }
     </script>
 </body>
